@@ -92,10 +92,9 @@ function loadTriangles() {
         var vtxBufferSize = 0; // the number of vertices in the vertex buffer
         var vtxColorBufferSize = 0;
         var vtxToAdd = []; // vtx coords to add to the coord array
+        var vtxColorToAdd = [];
         var indexOffset = vec3.create(); // the index offset for the current set
-        var colorIndexOffset = vec4.create();
         var triToAdd = vec3.create(); // tri indices to add to the index array
-        var triColorToAdd = vec4.create();
         
         for (var whichSet=0; whichSet<inputTriangles.length; whichSet++) {
             vec3.set(indexOffset,vtxBufferSize,vtxBufferSize,vtxBufferSize); // update vertex offset
@@ -113,12 +112,11 @@ function loadTriangles() {
                 indexArray.push(triToAdd[0],triToAdd[1],triToAdd[2]);
             } // end for triangles in set
 
-            // set up the triangle index array, adjusting indices across sets
-            // for (whichSetTri=0; whichSetTri<inputTriangles[whichSet].triangles.length; whichSetTri++) {
-            //     // console.log(inputTriangles[whichSet].material.diffuse);
-            //     vec4.add(triColorToAdd,colorIndexOffset,inputTriangles[whichSet].material.diffuse);
-            //     colorArray.push(triColorToAdd[0], triColorToAdd[1],triColorToAdd[2], 1);
-            // } // end for triangles in set
+            // set up the vertex coord array
+            for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++) {
+                vtxColorToAdd = inputTriangles[whichSet].material.diffuse;
+                colorArray.push(vtxColorToAdd[0],vtxColorToAdd[1],vtxColorToAdd[2],1.0);
+            } // end for vertices in set
 
             vtxBufferSize += inputTriangles[whichSet].vertices.length; // total number of vertices
             // vtxColorBufferSize += inputTriangles[whichSet].vertices.length;
@@ -142,8 +140,8 @@ function loadTriangles() {
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indexArray),gl.STATIC_DRAW); // indices to that buffer
 
         triangleColorBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleColorBuffer); // activate that buffer
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Float32Array(colorArray),gl.STATIC_DRAW); // indices to that buffer
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangleColorBuffer); // activate that buffer
+        gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(colorArray),gl.STATIC_DRAW); // indices to that buffer
 
     } // end if triangles found
 } // end load triangles
@@ -157,8 +155,7 @@ function setupShaders() {
         varying vec4 vColor;
 
         void main(void) {
-            // gl_FragColor = vColor;
-            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // all fragments are white
+            gl_FragColor = vColor;
         }
     `;
     
@@ -209,8 +206,8 @@ function setupShaders() {
                     gl.getAttribLocation(shaderProgram, "vertexPosition"); 
                 gl.enableVertexAttribArray(vertexPositionAttrib); // input to shader from array
 
-                // vertexColorAttrib = gl.getAttribLocation(shaderProgram, "vertexColor");
-                // gl.enableVertexAttribArray(vertexColorAttrib);
+                vertexColorAttrib = gl.getAttribLocation(shaderProgram, "vertexColor");
+                gl.enableVertexAttribArray(vertexColorAttrib);
 
                 shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
                 shaderProgram.vMatrixUniform = gl.getUniformLocation(shaderProgram, "uVMatrix");
@@ -248,8 +245,8 @@ function renderTriangles() {
     gl.vertexAttribPointer(vertexPositionAttrib,3,gl.FLOAT,false,0,0); // feed
 
 
-    // gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleColorBuffer);
-    // gl.vertexAttribPointer(vertexColorAttrib, 4, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, triangleColorBuffer);
+    gl.vertexAttribPointer(vertexColorAttrib, 4, gl.FLOAT, false, 0, 0);
 
     // triangle buffer: activate and render
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,triangleBuffer); // activate
