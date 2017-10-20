@@ -13,6 +13,7 @@ var selectEll = -1;
 var eye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
 var lookat = new vec3.fromValues(0,0,1);
 var lookUp = new vec4.fromValues(0,1,0);
+var light = [{x: -1, y: 3, z: -0.5, ambient: [1,1,1], diffuse: [1,1,1], specular: [1,1,1]}];
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
@@ -34,6 +35,7 @@ var colorArray = [];
 // ASSIGNMENT HELPER FUNCTIONS
 function transform(vtxs){
     var vtx = new vec3.fromValues(vtxs[0], vtxs[1], vtxs[2]);
+    // var res = vec3.create();
 
     var matview = mat4.create();
     var center = vec3.create();
@@ -50,6 +52,48 @@ function transform(vtxs){
     vec3.transformMat4(vtx, vtx, matPers);
 
     return vtx;
+}
+
+function lighting(normal,vertex,ka,kd,ks,n){
+    var color = [
+                    ka[0]*light[0].ambient[0],
+                    ka[1]*light[0].ambient[1],
+                    ka[2]*light[0].ambient[2]
+                ];
+    for(var lightIndex =0; lightIndex<light.length;lightIndex++){
+        lightSource = light[lightIndex];
+        var la = lightSource.ambient;
+        var ld = lightSource.diffuse;
+        var ls = lightSource.specular;
+
+        // console.log(ka,kd,ks,n);
+        var lightPos = vec3.fromValues(lightSource.x,lightSource.y,lightSource.z);
+
+        var lvec = vec3.create();
+        vec3.subtract(lvec,lightPos,vertex);
+        vec3.normalize(lvec,lvec);
+
+        var evec = vec3.create();
+        vec3.subtract(evec,eye,vertex);
+        vec3.normalize(evec,evec);
+
+        var hvec = vec3.create();
+        vec3.add(hvec,evec,lvec);
+        vec3.normalize(hvec,hvec);
+
+        vec3.normalize(lvec,lvec);
+        var nl = vec3.dot(normal,lvec);
+
+        var nh = vec3.dot(normal,hvec);
+
+        color[0] += kd[0]*ld[0]*nl+ks[0]*ls[0]*Math.pow(nh,n);
+        color[1] += kd[1]*ld[1]*nl+ks[1]*ls[1]*Math.pow(nh,n);
+        color[2] += kd[2]*ld[2]*nl+ks[2]*ls[2]*Math.pow(nh,n);
+        // console.log("light"+lightIndex+": "+color);
+    }
+
+    // color = ka*la+kd*ld*nl+ks*ls*Math.pow(nh,n);
+    return color;
 }
 
 // get the JSON file from the passed URL
@@ -104,8 +148,10 @@ function setupWebGL() {
 
 // read triangles in, load them into webgl buffers
 function loadTriangles() {
+    // console.log("triangles");
     var inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles");
-
+    // var inputTriangles = triangleJson();
+    // console.log(inputTriangles[0].vertices[0][0].toString());
     if (inputTriangles != String.null) { 
         var whichSetVert; // index of vertex in current triangle set
         var whichSetTri; // index of triangle in current triangle set
@@ -116,30 +162,38 @@ function loadTriangles() {
         
         for (var whichSet=0; whichSet<inputTriangles.length; whichSet++) {
 
+            // console.log("set:"+whichSet);
             vec3.set(indexOffset,vtxBufferSize,vtxBufferSize,vtxBufferSize); // update vertex offset
             
-            var color = inputTriangles[whichSet].material.diffuse;
+            // console.log("offset:"+indexOffset);
+            var ka = inputTriangles[whichSet].material.ambient;
+            var kd = inputTriangles[whichSet].material.diffuse;
+            var ks = inputTriangles[whichSet].material.specular;
+            var n = inputTriangles[whichSet].material.n;
 
             // set up the vertex coord array
 
             for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++) {
 
+                // console.log("vtx:"+whichSetVert);
                 vtxToAdd = transform(inputTriangles[whichSet].vertices[whichSetVert]);
+                var normal = inputTriangles[whichSet].normals[whichSetVert];
 
                 coordArray.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]);
-                colorArray.push(color[0],color[1],color[2]);
 
-                vtxBufferSize += 1;
-                vtxColorBufferSize += 1;
+                var color = lighting(normal,inputTriangles[whichSet].vertices[whichSetVert],ka,kd,ks,n);
+                colorArray.push(color[0],color[1],color[2]);
+                vtxBufferSize +=1;
+                // console.log("vtxBufferSize"+vtxBufferSize);
 
             } // end for vertices in set
             
             // set up the triangle index array, adjusting indices across sets
             for (whichSetTri=0; whichSetTri<inputTriangles[whichSet].triangles.length; whichSetTri++) {
+                // console.log("tri:"+whichSetTri);
                 vec3.add(triToAdd,indexOffset,inputTriangles[whichSet].triangles[whichSetTri]);
-
+                // console.log(indexOffset,inputTriangles[whichSet].triangles[whichSetTri],triToAdd);
                 indexArray.push(triToAdd[0], triToAdd[1], triToAdd[2]);
-
                 triBufferSize += 3;
             } // end for triangles in set
 
@@ -160,7 +214,13 @@ function loadEllipes() {
         var lonInt = 100;
         
         for (var whichSet=0; whichSet<inputEcllipes.length; whichSet++) {
-            var color = inputEcllipes[whichSet].diffuse;
+            var ka = inputEcllipes[whichSet].ambient;
+            var kd = inputEcllipes[whichSet].diffuse;
+            var ks = inputEcllipes[whichSet].specular;
+            var n = inputEcllipes[whichSet].n;
+            var la = light.ambient;
+            var ld = light.diffuse;
+            var ls = light.specular;
 
             var radiusA = inputEcllipes[whichSet].a;
             var radiusB = inputEcllipes[whichSet].b;
@@ -189,6 +249,11 @@ function loadEllipes() {
                 y = radiusB * y + centerY;
                 z = radiusC * z + centerZ;
 
+                var normal = vec3.clone(getnormal([x,y,z],[centerX,centerY,centerZ],[radiusA,radiusB,radiusC]));
+                vec3.normalize(normal,normal);
+
+                var color = lighting(normal,[x,y,z],ka,kd,ks,n);
+
                 var coord = transform([x,y,z]);
 
                 coordArray.push(coord[0],coord[1],coord[2]);
@@ -198,19 +263,27 @@ function loadEllipes() {
                 var first =  vtxBufferSize;
                 var second = first + lonInt + 1;
 
-                vtxBufferSize += 1;
+                vtxBufferSize +=1;
 
+                // console.log("vtxBufferSize:"+vtxBufferSize,first,second);
                 indexArray.push(first,second,first + 1);
                 indexArray.push(second,second + 1,first + 1);
 
-                triBufferSize += 6;
+                triBufferSize +=6;
               }
             }
-            triBufferSize -= triBufferSize/latInt;
+            triBufferSize -=triBufferSize/latInt;
         } // end for each triangle set 
         
     } // end if triangles found
 } // end load triangles
+
+function getnormal(coord,center,radius){
+    var x = (coord[0]*2-center[0]*2)/radius[0]/radius[0];
+    var y = (coord[1]*2-center[1]*2)/radius[1]/radius[1];
+    var z = (coord[2]*2-center[2]*2)/radius[2]/radius[2];
+    return [x,y,z];
+}
 
 function bindBuffers(){
 
