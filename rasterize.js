@@ -8,17 +8,19 @@ var INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog2/triangles.json"; 
 var INPUT_SPHERES_URL = "https://ncsucgclass.github.io/prog2/ellipsoids.json"; // ellipsoids file loc
 var INPUT_LIGHTS_URL = "https://ncsucgclass.github.io/prog2/lights.json"; // lights file loc
 
-var selectTri = -1;
-var selectEll = -1;
+var selectTriID = -1;
+var selectEliID = -1;
+var trilNum = 0;
+var elilNum = 0;
+
 var eye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
-var lookat = new vec3.fromValues(0,0,1);
-var lookUp = new vec4.fromValues(0,1,0);
-var light = [{x: -1, y: 3, z: -0.5, ambient: [1,1,1], diffuse: [1,1,1], specular: [1,1,1]}];
+var lookat;
+var lookup;
+var light;
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
 var vertexBuffer; // this contains vertex coordinates in triples
-
 var triangleColorBuffer; // this contains indices into vertexBuffer in triples
 var triangleBuffer; // this contains indices into vertexBuffer in triples
 var triBufferSize = 0; // the number of indices in the triangle buffer
@@ -32,12 +34,13 @@ var coordArray = []; // 1D array of vertex coords for WebGL
 var indexArray = []; // 1D array of vertex indices for WebGL
 var colorArray = []; // 1D array of vertex colors for WebGL
 
+
 // ASSIGNMENT HELPER FUNCTIONS
 function transform(vtxs){
     var vtx = new vec3.fromValues(vtxs[0], vtxs[1], vtxs[2]);
 
     var center = vec3.add(vec3.create(),eye,lookat);
-    var matview = mat4.lookAt(mat4.create(), eye, center, lookUp);
+    var matview = mat4.lookAt(mat4.create(), eye, center, lookup);
     var matPers = mat4.perspective(mat4.create(), Math.PI/2., 1, 0.1, 10);
 
     vec3.transformMat4(vtx, vtx, matview);
@@ -138,7 +141,6 @@ function setupWebGL() {
 
 // read triangles in, load them into webgl buffers
 function loadTriangles() {
-
     var inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles");
 
     if (inputTriangles != String.null) { 
@@ -148,6 +150,8 @@ function loadTriangles() {
         var vtxColorToAdd = [];
         var indexOffset = vec3.create(); // the index offset for the current set
         var triToAdd = vec3.create(); // tri indices to add to the index array
+
+        trilNum = inputTriangles.length;
         
         for (var whichSet=0; whichSet<inputTriangles.length; whichSet++) {
 
@@ -160,15 +164,21 @@ function loadTriangles() {
 
             // set up the vertex coord array
             for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++) {
-
                 vtxToAdd = transform(inputTriangles[whichSet].vertices[whichSetVert]);
-                var normal = inputTriangles[whichSet].normals[whichSetVert];
-
+                
+                // select triangle
+                if(whichSet === selectTriID) {
+                    vtxToAdd[0] = vtxToAdd[0] * 1.2 >= 1? 0.999 : vtxToAdd[0] * 1.2;
+                    vtxToAdd[1] = vtxToAdd[1] * 1.2 >= 1? 0.999 : vtxToAdd[1] * 1.2;
+                    vtxToAdd[2] = vtxToAdd[2] * 1.2 >= 1? 0.999 : vtxToAdd[2] * 1.2;
+                }
                 coordArray.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]);
-
+                
+                var normal = inputTriangles[whichSet].normals[whichSetVert];
                 var color = lighting(normal,inputTriangles[whichSet].vertices[whichSetVert],ka,kd,ks,n);
                 colorArray.push(color[0],color[1],color[2]);
                 vtxBufferSize +=1;
+                vtxColorBufferSize += 1;
 
             } // end for vertices in set
             
@@ -194,6 +204,8 @@ function loadEllipes() {
 
         var latInt = 100;
         var lonInt = 100;
+
+        eliNum = inputEcllipes.length;
         
         for (var whichSet=0; whichSet<inputEcllipes.length; whichSet++) {
             var ka = inputEcllipes[whichSet].ambient;
@@ -235,6 +247,13 @@ function loadEllipes() {
 
                 var coord = transform([x,y,z]);
                 var color = lighting(normal,[x,y,z],ka,kd,ks,n);
+
+                // select model
+                if(whichSet === selectEliID) {
+                    coord[0] = coord[0] * 1.2 >= 1? 0.999 : coord[0] * 1.2;
+                    coord[1] = coord[1] * 1.2 >= 1? 0.999 : coord[1] * 1.2;
+                    coord[2] = coord[2] * 1.2 >= 1? 0.999 : coord[2] * 1.2;
+                }
                 
                 var first =  vtxBufferSize;
                 var second = first + lonInt + 1;
@@ -290,8 +309,6 @@ function setupShaders() {
 
 
     var vShaderCode = `
-        precision lowp float;
-
         attribute vec3 vertexPosition;
         attribute vec3 vertexColor;
         varying lowp vec4 vColor;
@@ -356,11 +373,95 @@ function renderObjects() {
 
 } // end render triangles
 
+function reset() {
+    eye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
+    lookat = new vec3.fromValues(0,0,1);
+    lookup = new vec4.fromValues(0,1,0);
+    light = [{x: -1, y: 3, z: -0.5, ambient: [1,1,1], diffuse: [1,1,1], specular: [1,1,1]}];
 
-function main() {
+    drawMain();
+}
+
+// add keyboard event
+document.addEventListener('keydown', function(event) {
+    console.log(event.key);
+    switch(event.key) {
+        case "q":
+            vec3.add(eye,eye,[0,-0.1,0]);
+            break;
+        case "e":
+            vec3.add(eye,eye,[0,0.1,0]);
+            break;
+        case "a":
+            vec3.add(eye,eye,[0.1,0,0]);
+            break;
+        case "d":
+            vec3.add(eye,eye,[-0.1,0,0]);
+            break;
+        case "w":
+            vec3.add(eye,eye,[0,0,0.1]);
+            break;
+        case "s":
+            vec3.add(eye,eye,[0,0,-0.1]);
+            break;
+        case "A":
+            vec3.add(lookat,lookat,[-0.1,0,0]);
+            break;
+        case "D":
+            vec3.add(lookat,lookat,[0.1,0,0]);
+            break;
+        case "W":
+            vec3.add(lookat,lookat,[0,-0.1,0]);
+            break;
+        case "S":
+            vec3.add(lookat,lookat,[0,0.1,0]);
+            break;
+        case "ArrowLeft": 
+            selectTriID = (selectTriID+1)%trilNum;
+            break;
+        case "ArrowRight": 
+            selectTriID = (selectTriID-1+trilNum)%trilNum;
+            break;
+        case "ArrowUp": 
+            selectEliID = (selectEliID+1)%eliNum;
+            break;
+        case "ArrowDown": 
+            selectEliID = (selectEliID-1+eliNum)%eliNum;
+            break;
+        case " ": 
+            selectTriID = -1;
+            selectEliID = -1;
+            break;
+        default:
+            break;
+    }
+
+    drawMain(); 
+});
+
+function drawMain() {
+    // console.log(eye);
+    // console.log(lookat);
+    // console.log(lookup);
+
+    // reinit gl and buffer size
+    gl = null; // the all powerful gl object. It's all here folks!
+    triBufferSize = 0; // the number of indices in the triangle buffer
+    vtxBufferSize = 0; // the number of vertices in the vertex buffer
+
+    coordArray = []; // 1D array of vertex coords for WebGL
+    indexArray = []; // 1D array of vertex indices for WebGL
+
     setupWebGL(); // set up the webGL environment
     loadTriangles(); // load in the triangles from tri file
     loadEllipes(); // load in the triangles from tri file
     setupShaders(); // setup the webGL shaders
     renderObjects(); // draw the triangles using webGL
+}
+
+function main() {
+    lookat = new vec3.fromValues(0,0,1);
+    lookup = new vec3.fromValues(0,1,0);
+    light = [{x: -1, y: 3, z: -0.5, ambient: [1,1,1], diffuse: [1,1,1], specular: [1,1,1]}];
+    drawMain();
 } // end main
