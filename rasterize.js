@@ -4,7 +4,7 @@
 const WIN_Z = 0;  // default graphics window z coord in world space
 const WIN_LEFT = 0; const WIN_RIGHT = 1;  // default left and right x coords in world space
 const WIN_BOTTOM = 0; const WIN_TOP = 1;  // default top and bottom y coords in world space
-var INPUT_TRIANGLES_URL = "https://jdeng8.github.io/prog2/triangles.json"; // triangles file loc
+var INPUT_TRIANGLES_URL = "https://ncsucgclass.github.io/prog2/triangles.json"; // triangles file loc
 var INPUT_SPHERES_URL = "https://ncsucgclass.github.io/prog2/ellipsoids.json"; // ellipsoids file loc
 var INPUT_LIGHTS_URL = "https://ncsucgclass.github.io/prog2/lights.json"; // lights file loc
 
@@ -23,30 +23,22 @@ var triangleColorBuffer; // this contains indices into vertexBuffer in triples
 var triangleBuffer; // this contains indices into vertexBuffer in triples
 var triBufferSize = 0; // the number of indices in the triangle buffer
 var vtxBufferSize = 0; // the number of vertices in the vertex buffer
-var vtxColorBufferSize = 0;
+var vtxColorBufferSize = 0; // the number of vertices in the vertex buffer
 
 var vertexPositionAttrib; // where to put position for vertex 
 var vertexColorAttrib; // where to put position for vertex shader
 
 var coordArray = []; // 1D array of vertex coords for WebGL
 var indexArray = []; // 1D array of vertex indices for WebGL
-var colorArray = [];
+var colorArray = []; // 1D array of vertex colors for WebGL
 
 // ASSIGNMENT HELPER FUNCTIONS
 function transform(vtxs){
     var vtx = new vec3.fromValues(vtxs[0], vtxs[1], vtxs[2]);
-    // var res = vec3.create();
 
-    var matview = mat4.create();
-    var center = vec3.create();
-    center = vec3.add(center,eye,lookat);
-    matview = mat4.lookAt(matview, eye, center, lookUp);
-
-    var matPers = mat4.create();
-    matPers = mat4.perspective(matPers, Math.PI/2., 1, 0.1, 10);
-
-    var resize = mat4.fromValues(2,0,0,0,0,2,0,0,0,0,2,0,-1,-1,-1,1);
-    var reflection = mat4.fromValues(-1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1);
+    var center = vec3.add(vec3.create(),eye,lookat);
+    var matview = mat4.lookAt(mat4.create(), eye, center, lookUp);
+    var matPers = mat4.perspective(mat4.create(), Math.PI/2., 1, 0.1, 10);
 
     vec3.transformMat4(vtx, vtx, matview);
     vec3.transformMat4(vtx, vtx, matPers);
@@ -55,18 +47,14 @@ function transform(vtxs){
 }
 
 function lighting(normal,vertex,ka,kd,ks,n){
-    var color = [
-                    ka[0]*light[0].ambient[0],
-                    ka[1]*light[0].ambient[1],
-                    ka[2]*light[0].ambient[2]
-                ];
+    var color = [0, 0, 0];
     for(var lightIndex =0; lightIndex<light.length;lightIndex++){
-        lightSource = light[lightIndex];
+        var lightSource = light[lightIndex];
+        
         var la = lightSource.ambient;
         var ld = lightSource.diffuse;
         var ls = lightSource.specular;
 
-        // console.log(ka,kd,ks,n);
         var lightPos = vec3.fromValues(lightSource.x,lightSource.y,lightSource.z);
 
         var lvec = vec3.create();
@@ -82,17 +70,16 @@ function lighting(normal,vertex,ka,kd,ks,n){
         vec3.normalize(hvec,hvec);
 
         vec3.normalize(lvec,lvec);
-        var nl = vec3.dot(normal,lvec);
 
+        var nl = vec3.dot(normal,lvec);
         var nh = vec3.dot(normal,hvec);
 
-        color[0] += kd[0]*ld[0]*nl+ks[0]*ls[0]*Math.pow(nh,n);
-        color[1] += kd[1]*ld[1]*nl+ks[1]*ls[1]*Math.pow(nh,n);
-        color[2] += kd[2]*ld[2]*nl+ks[2]*ls[2]*Math.pow(nh,n);
-        // console.log("light"+lightIndex+": "+color);
+        color[0] += (ka[0]*la[0] + kd[0]*ld[0]*nl+ks[0]*ls[0]*Math.pow(nh,n));
+        color[1] += (ka[1]*la[1] + kd[1]*ld[1]*nl+ks[1]*ls[1]*Math.pow(nh,n));
+        color[2] += (ka[2]*la[2] + kd[2]*ld[2]*nl+ks[2]*ls[2]*Math.pow(nh,n));
+
     }
 
-    // color = ka*la+kd*ld*nl+ks*ls*Math.pow(nh,n);
     return color;
 }
 
@@ -126,6 +113,9 @@ function getJSONFile(url,descr) {
 // set up the webGL environment
 function setupWebGL() {
 
+    triBufferSize = 0; // the number of indices in the triangle buffer
+    vtxBufferSize = 0; // the number of vertices in the vertex buffer
+
     // Get the canvas and context
     var canvas = document.getElementById("myWebGLCanvas"); // create a js canvas
     gl = canvas.getContext("webgl"); // get a webgl object from it
@@ -148,10 +138,9 @@ function setupWebGL() {
 
 // read triangles in, load them into webgl buffers
 function loadTriangles() {
-    // console.log("triangles");
+
     var inputTriangles = getJSONFile(INPUT_TRIANGLES_URL,"triangles");
-    // var inputTriangles = triangleJson();
-    // console.log(inputTriangles[0].vertices[0][0].toString());
+
     if (inputTriangles != String.null) { 
         var whichSetVert; // index of vertex in current triangle set
         var whichSetTri; // index of triangle in current triangle set
@@ -162,20 +151,16 @@ function loadTriangles() {
         
         for (var whichSet=0; whichSet<inputTriangles.length; whichSet++) {
 
-            // console.log("set:"+whichSet);
             vec3.set(indexOffset,vtxBufferSize,vtxBufferSize,vtxBufferSize); // update vertex offset
             
-            // console.log("offset:"+indexOffset);
             var ka = inputTriangles[whichSet].material.ambient;
             var kd = inputTriangles[whichSet].material.diffuse;
             var ks = inputTriangles[whichSet].material.specular;
             var n = inputTriangles[whichSet].material.n;
 
             // set up the vertex coord array
-
             for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++) {
 
-                // console.log("vtx:"+whichSetVert);
                 vtxToAdd = transform(inputTriangles[whichSet].vertices[whichSetVert]);
                 var normal = inputTriangles[whichSet].normals[whichSetVert];
 
@@ -184,15 +169,12 @@ function loadTriangles() {
                 var color = lighting(normal,inputTriangles[whichSet].vertices[whichSetVert],ka,kd,ks,n);
                 colorArray.push(color[0],color[1],color[2]);
                 vtxBufferSize +=1;
-                // console.log("vtxBufferSize"+vtxBufferSize);
 
             } // end for vertices in set
             
             // set up the triangle index array, adjusting indices across sets
             for (whichSetTri=0; whichSetTri<inputTriangles[whichSet].triangles.length; whichSetTri++) {
-                // console.log("tri:"+whichSetTri);
                 vec3.add(triToAdd,indexOffset,inputTriangles[whichSet].triangles[whichSetTri]);
-                // console.log(indexOffset,inputTriangles[whichSet].triangles[whichSetTri],triToAdd);
                 indexArray.push(triToAdd[0], triToAdd[1], triToAdd[2]);
                 triBufferSize += 3;
             } // end for triangles in set
@@ -204,7 +186,7 @@ function loadTriangles() {
 
 function loadEllipes() {
     var inputEcllipes = getJSONFile(INPUT_SPHERES_URL,"ellipsoids");
-    // console.log(inputTriangles[0].vertices[0][0].toString());
+
     if (inputEcllipes != String.null) { 
         var vtxToAdd = []; // vtx coords to add to the coord array
         var indexOffset = vec3.create(); // the index offset for the current set
@@ -244,7 +226,6 @@ function loadEllipes() {
                 var y = cosTheta;
                 var z = sinPhi * sinTheta;
 
-
                 x = radiusA * x + centerX;
                 y = radiusB * y + centerY;
                 z = radiusC * z + centerZ;
@@ -252,23 +233,18 @@ function loadEllipes() {
                 var normal = vec3.clone(getnormal([x,y,z],[centerX,centerY,centerZ],[radiusA,radiusB,radiusC]));
                 vec3.normalize(normal,normal);
 
-                var color = lighting(normal,[x,y,z],ka,kd,ks,n);
-
                 var coord = transform([x,y,z]);
-
-                coordArray.push(coord[0],coord[1],coord[2]);
-
-                colorArray.push(color[0],color[1],color[2]);
-
+                var color = lighting(normal,[x,y,z],ka,kd,ks,n);
+                
                 var first =  vtxBufferSize;
                 var second = first + lonInt + 1;
 
-                vtxBufferSize +=1;
-
-                // console.log("vtxBufferSize:"+vtxBufferSize,first,second);
+                coordArray.push(coord[0],coord[1],coord[2]);
+                colorArray.push(color[0],color[1],color[2]);
                 indexArray.push(first,second,first + 1);
                 indexArray.push(second,second + 1,first + 1);
 
+                vtxBufferSize +=1;
                 triBufferSize +=6;
               }
             }
@@ -276,6 +252,21 @@ function loadEllipes() {
         } // end for each triangle set 
         
     } // end if triangles found
+
+    // send the vertex coords to webGL 
+    vertexBuffer = gl.createBuffer(); // init empty vertex coord buffer
+    gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate that buffer
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(coordArray),gl.STATIC_DRAW); // coords to that buffer
+    
+    // send the triangle indices to webGL
+    triangleBuffer = gl.createBuffer(); // init empty triangle index buffer
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffer); // activate that buffer
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indexArray),gl.STATIC_DRAW); // indices to that buffer
+
+    triangleColorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, triangleColorBuffer); // activate that buffer
+    gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(colorArray),gl.STATIC_DRAW); // indices to that buffer
+
 } // end load triangles
 
 function getnormal(coord,center,radius){
@@ -285,22 +276,6 @@ function getnormal(coord,center,radius){
     return [x,y,z];
 }
 
-function bindBuffers(){
-
-        // send the vertex coords to webGL
-        vertexBuffer = gl.createBuffer(); // init empty vertex coord buffer
-        gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate that buffer
-        gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(coordArray),gl.STATIC_DRAW); // coords to that buffer
-        
-        // send the triangle indices to webGL
-        triangleBuffer = gl.createBuffer(); // init empty triangle index buffer
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, triangleBuffer); // activate that buffer
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,new Uint16Array(indexArray),gl.STATIC_DRAW); // indices to that buffer
-
-        triangleColorBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, triangleColorBuffer); // activate that buffer
-        gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(colorArray),gl.STATIC_DRAW); // indices to that buffer
-}
 // setup the webGL shaders
 function setupShaders() {
     var fShaderCode = `
@@ -328,12 +303,10 @@ function setupShaders() {
     `;
     
     try {
-        // console.log("fragment shader: "+fShaderCode);
         var fShader = gl.createShader(gl.FRAGMENT_SHADER); // create frag shader
         gl.shaderSource(fShader,fShaderCode); // attach code to shader
         gl.compileShader(fShader); // compile the code for gpu execution
 
-        // console.log("vertex shader: "+vShaderCode);
         var vShader = gl.createShader(gl.VERTEX_SHADER); // create vertex shader
         gl.shaderSource(vShader,vShaderCode); // attach code to shader
         gl.compileShader(vShader); // compile the code for gpu execution
@@ -380,8 +353,6 @@ function renderObjects() {
     gl.vertexAttribPointer(vertexColorAttrib,3,gl.FLOAT,false,0,0); // feed
 
     gl.drawElements(gl.TRIANGLES,triBufferSize,gl.UNSIGNED_SHORT,0); // render
-    triBufferSize = 0; // the number of indices in the triangle buffer
-    vtxBufferSize = 0; // the number of vertices in the vertex buffer
 
 } // end render triangles
 
@@ -390,7 +361,6 @@ function main() {
     setupWebGL(); // set up the webGL environment
     loadTriangles(); // load in the triangles from tri file
     loadEllipes(); // load in the triangles from tri file
-    bindBuffers();
     setupShaders(); // setup the webGL shaders
     renderObjects(); // draw the triangles using webGL
 } // end main
