@@ -22,6 +22,11 @@ var nAdd = 0;
 var aAdd = 0;
 var dAdd = 0;
 var sAdd = 0;
+var triTranslation = [0.0,0.0,0.0];
+var eliTranslation = [0.0,0.0,0.0];
+var xTheta = 0;
+var yTheta = 0;
+var zTheta = 0;
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
@@ -55,14 +60,12 @@ function transform(vtxs){
 
 function lighting(normal,vertex,ka,kd,ks,n){
     var color = [0, 0, 0];
-    for(var lightIndex =0; lightIndex<light.length;lightIndex++){
-        var lightSource = light[lightIndex];
-        
-        var la = lightSource.ambient;
-        var ld = lightSource.diffuse;
-        var ls = lightSource.specular;
+    for(var lightIndex =0; lightIndex<light.length;lightIndex++){        
+        var la = light[lightIndex].ambient;
+        var ld = light[lightIndex].diffuse;
+        var ls = light[lightIndex].specular;
 
-        var lightPos = vec3.fromValues(lightSource.x,lightSource.y,lightSource.z);
+        var lightPos = vec3.fromValues(light[lightIndex].x,light[lightIndex].y,light[lightIndex].z);
 
         var lvec = vec3.create();
         vec3.subtract(lvec,lightPos,vertex);
@@ -201,12 +204,27 @@ function loadTriangles() {
                 
                 // select triangle
                 if(whichSet === selectTriID) {
-                    vtxToAdd[0] = vtxToAdd[0] * 1.2 >= 1? 0.999 : vtxToAdd[0] * 1.2;
-                    vtxToAdd[1] = vtxToAdd[1] * 1.2 >= 1? 0.999 : vtxToAdd[1] * 1.2;
-                    vtxToAdd[2] = vtxToAdd[2] * 1.2 >= 1? 0.999 : vtxToAdd[2] * 1.2;
+                    vtxToAdd[0] += triTranslation[0];
+                    vtxToAdd[1] += triTranslation[1];
+                    vtxToAdd[2] += triTranslation[2];
+
+                    vtxToAdd[0] = vtxToAdd[0] * 1.2;
+                    vtxToAdd[1] = vtxToAdd[1] * 1.2;
+                    vtxToAdd[2] = vtxToAdd[2] * 1.2;
+
+                    if(vtxToAdd[2] > 0){
+                        var vtxVec = vec3.fromValues(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]);
+                        vec3.normalize(vtxVec,vtxVec);
+                        vtxToAdd[0] = vtxVec[0];
+                        vtxToAdd[1] = vtxVec[1];
+                        vtxToAdd[2] = vtxVec[2];
+                    }
+                    else {
+                        vtxToAdd[2] = 1;   
+                    }
                 }
                 coordArray.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]);
-                
+
                 var normal = inputTriangles[whichSet].normals[whichSetVert];
                 var color = lighting(normal,inputTriangles[whichSet].vertices[whichSetVert],ka,kd,ks,n);
                 colorArray.push(color[0],color[1],color[2]);
@@ -296,9 +314,22 @@ function loadEllipes() {
 
                 // select model
                 if(whichSet === selectEliID) {
+                    coord[0] += eliTranslation[0];
+                    coord[1] += eliTranslation[1];
+                    coord[2] += eliTranslation[2];
+
+                    // coord[0] = coord[0] * 1.2;
+                    // coord[1] = coord[1] * 1.2;
+                    // coord[2] = coord[2] * 1.2;
                     coord[0] = coord[0] * 1.2 >= 1? 0.999 : coord[0] * 1.2;
                     coord[1] = coord[1] * 1.2 >= 1? 0.999 : coord[1] * 1.2;
                     coord[2] = coord[2] * 1.2 >= 1? 0.999 : coord[2] * 1.2;
+
+                    // var vtxVec = vec3.fromValues(coord[0],coord[1],coord[2]);
+                    // vec3.normalize(vtxVec,vtxVec);
+                    // coord[0] = vtxVec[0];
+                    // coord[1] = vtxVec[1];
+                    // coord[2] = vtxVec[2];
                 }
                 
                 var first =  vtxBufferSize;
@@ -424,6 +455,18 @@ function reset() {
     lookat = new vec3.fromValues(0,0,1);
     lookup = new vec4.fromValues(0,1,0);
     light = [{x: -1, y: 3, z: -0.5, ambient: [1,1,1], diffuse: [1,1,1], specular: [1,1,1]}];
+    lightingMethod = 1;
+    nAdd = 0;
+    aAdd = 0;
+    dAdd = 0;
+    sAdd = 0;
+    selectTriID = -1;
+    selectEliID = -1;
+    triTranslation = [0.0,0.0,0.0];
+    eliTranslation = [0.0,0.0,0.0];
+    xTheta = 0;
+    yTheta = 0;
+    zTheta = 0;
 
     drawMain();
 }
@@ -463,15 +506,19 @@ document.addEventListener('keydown', function(event) {
             vec3.add(lookat,lookat,[0,0.1,0]);
             break;
         case "ArrowLeft": 
+            triTranslation = [0.0,0.0,0.0];
             selectTriID = (selectTriID+1)%trilNum;
             break;
         case "ArrowRight": 
+            triTranslation = [0.0,0.0,0.0];
             selectTriID = (selectTriID-1+trilNum)%trilNum;
             break;
         case "ArrowUp": 
+            eliTranslation = [0.0,0.0,0.0];
             selectEliID = (selectEliID+1)%eliNum;
             break;
         case "ArrowDown": 
+            eliTranslation = [0.0,0.0,0.0];
             selectEliID = (selectEliID-1+eliNum)%eliNum;
             break;
         case " ": 
@@ -493,30 +540,30 @@ document.addEventListener('keydown', function(event) {
         case "3": 
             sAdd += 0.1;
             break;          
-        // case "k": 
-        //     break;
-        // case ";": 
-        //     break;
-        // case "o": 
-        //     break;
-        // case "l": 
-        //     break;
-        // case "i": 
-        //     break;
-        // case "p": 
-        //     break;
-        // case "K": 
-        //     break;
-        // case ":": 
-        //     break;
-        // case "O": 
-        //     break;
-        // case "L": 
-        //     break;
-        // case "I": 
-        //     break;
-        // case "P": 
-        //     break;
+        case "k": 
+            vec3.add(triTranslation,triTranslation,[-0.1,0,0]);
+            vec3.add(eliTranslation,eliTranslation,[-0.1,0,0]);
+            break;
+        case ";": 
+            vec3.add(triTranslation,triTranslation,[0.1,0,0]);
+            vec3.add(eliTranslation,eliTranslation,[0.1,0,0]);
+            break;
+        case "o": 
+            vec3.add(triTranslation,triTranslation,[0,0,-0.1]);
+            vec3.add(eliTranslation,eliTranslation,[0,0,-0.1]);
+            break;
+        case "l": 
+            vec3.add(triTranslation,triTranslation,[0,0,0.1]);
+            vec3.add(eliTranslation,eliTranslation,[0,0,0.1]);
+            break;
+        case "i": 
+            vec3.add(triTranslation,triTranslation,[0,0.1,0]);
+            vec3.add(eliTranslation,eliTranslation,[0,0.1,0]);
+            break;
+        case "p": 
+            vec3.add(triTranslation,triTranslation,[0,-0.1,0]);
+            vec3.add(eliTranslation,eliTranslation,[0,-0.1,0]);
+            break;
         default:
             break;
     }
