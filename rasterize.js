@@ -17,6 +17,11 @@ var eye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world sp
 var lookat;
 var lookup;
 var light;
+var lightingMethod;
+var nAdd = 0;
+var aAdd = 0;
+var dAdd = 0;
+var sAdd = 0;
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
@@ -33,7 +38,6 @@ var vertexColorAttrib; // where to put position for vertex shader
 var coordArray = []; // 1D array of vertex coords for WebGL
 var indexArray = []; // 1D array of vertex indices for WebGL
 var colorArray = []; // 1D array of vertex colors for WebGL
-
 
 // ASSIGNMENT HELPER FUNCTIONS
 function transform(vtxs){
@@ -72,14 +76,30 @@ function lighting(normal,vertex,ka,kd,ks,n){
         vec3.add(hvec,evec,lvec);
         vec3.normalize(hvec,hvec);
 
-        vec3.normalize(lvec,lvec);
+        var normal2 = vec3.create();
+        vec3.add(normal2, normal, normal);
 
+        var rvec = vec3.create();
+        vec3.subtract(rvec,normal2,lvec);
+        vec3.normalize(rvec,rvec);
+
+        var rv = vec3.dot(rvec, evec);
         var nl = vec3.dot(normal,lvec);
         var nh = vec3.dot(normal,hvec);
 
-        color[0] += (ka[0]*la[0] + kd[0]*ld[0]*nl+ks[0]*ls[0]*Math.pow(nh,n));
-        color[1] += (ka[1]*la[1] + kd[1]*ld[1]*nl+ks[1]*ls[1]*Math.pow(nh,n));
-        color[2] += (ka[2]*la[2] + kd[2]*ld[2]*nl+ks[2]*ls[2]*Math.pow(nh,n));
+        if(lightingMethod == 1) {
+            // blinn-phong model
+            color[0] += (ka[0]*la[0] + kd[0]*ld[0]*nl+ks[0]*ls[0]*Math.pow(nh,n));
+            color[1] += (ka[1]*la[1] + kd[1]*ld[1]*nl+ks[1]*ls[1]*Math.pow(nh,n));
+            color[2] += (ka[2]*la[2] + kd[2]*ld[2]*nl+ks[2]*ls[2]*Math.pow(nh,n));    
+        }
+        else {
+            // phong model
+            color[0] += (ka[0]*la[0] + kd[0]*ld[0]*nl+ks[0]*ls[0]*Math.pow(rv,n));
+            color[1] += (ka[1]*la[1] + kd[1]*ld[1]*nl+ks[1]*ls[1]*Math.pow(rv,n));
+            color[2] += (ka[2]*la[2] + kd[2]*ld[2]*nl+ks[2]*ls[2]*Math.pow(rv,n));    
+        }
+        
 
     }
 
@@ -162,6 +182,19 @@ function loadTriangles() {
             var ks = inputTriangles[whichSet].material.specular;
             var n = inputTriangles[whichSet].material.n;
 
+            ka[0] = (ka[0] + aAdd) % 1;
+            ka[1] = (ka[1] + aAdd) % 1;
+            ka[2] = (ka[2] + aAdd) % 1;
+            kd[0] = (kd[0] + dAdd) % 1;
+            kd[1] = (kd[1] + dAdd) % 1;
+            kd[2] = (kd[2] + dAdd) % 1;
+            ks[0] = (ks[0] + sAdd) % 1;
+            ks[1] = (ks[1] + sAdd) % 1;
+            ks[2] = (ks[2] + sAdd) % 1;
+            n[0] = (n[0] + nAdd) % 20;
+            n[1] = (n[1] + nAdd) % 20;
+            n[2] = (n[2] + nAdd) % 20;
+
             // set up the vertex coord array
             for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++) {
                 vtxToAdd = transform(inputTriangles[whichSet].vertices[whichSetVert]);
@@ -215,6 +248,19 @@ function loadEllipes() {
             var la = light.ambient;
             var ld = light.diffuse;
             var ls = light.specular;
+
+            ka[0] = (ka[0] + aAdd) % 1;
+            ka[1] = (ka[1] + aAdd) % 1;
+            ka[2] = (ka[2] + aAdd) % 1;
+            kd[0] = (kd[0] + dAdd) % 1;
+            kd[1] = (kd[1] + dAdd) % 1;
+            kd[2] = (kd[2] + dAdd) % 1;
+            ks[0] = (ks[0] + sAdd) % 1;
+            ks[1] = (ks[1] + sAdd) % 1;
+            ks[2] = (ks[2] + sAdd) % 1;
+            n[0] = (n[0] + nAdd) % 20;
+            n[1] = (n[1] + nAdd) % 20;
+            n[2] = (n[2] + nAdd) % 20;
 
             var radiusA = inputEcllipes[whichSet].a;
             var radiusB = inputEcllipes[whichSet].b;
@@ -432,6 +478,45 @@ document.addEventListener('keydown', function(event) {
             selectTriID = -1;
             selectEliID = -1;
             break;
+        case "b": 
+            lightingMethod = -lightingMethod;
+            break;
+        case "n": 
+            nAdd += 1;
+            break;
+        case "1": 
+            aAdd += 0.1;
+            break;
+        case "2": 
+            dAdd += 0.1;
+            break;
+        case "3": 
+            sAdd += 0.1;
+            break;          
+        // case "k": 
+        //     break;
+        // case ";": 
+        //     break;
+        // case "o": 
+        //     break;
+        // case "l": 
+        //     break;
+        // case "i": 
+        //     break;
+        // case "p": 
+        //     break;
+        // case "K": 
+        //     break;
+        // case ":": 
+        //     break;
+        // case "O": 
+        //     break;
+        // case "L": 
+        //     break;
+        // case "I": 
+        //     break;
+        // case "P": 
+        //     break;
         default:
             break;
     }
@@ -451,6 +536,7 @@ function drawMain() {
 
     coordArray = []; // 1D array of vertex coords for WebGL
     indexArray = []; // 1D array of vertex indices for WebGL
+    colorArray = []; // 1D array of vertex indices for WebGL
 
     setupWebGL(); // set up the webGL environment
     loadTriangles(); // load in the triangles from tri file
@@ -463,5 +549,6 @@ function main() {
     lookat = new vec3.fromValues(0,0,1);
     lookup = new vec3.fromValues(0,1,0);
     light = [{x: -1, y: 3, z: -0.5, ambient: [1,1,1], diffuse: [1,1,1], specular: [1,1,1]}];
+    lightingMethod = 1;
     drawMain();
 } // end main
