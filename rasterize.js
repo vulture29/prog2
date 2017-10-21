@@ -102,8 +102,6 @@ function lighting(normal,vertex,ka,kd,ks,n){
             color[1] += (ka[1]*la[1] + kd[1]*ld[1]*nl+ks[1]*ls[1]*Math.pow(rv,n));
             color[2] += (ka[2]*la[2] + kd[2]*ld[2]*nl+ks[2]*ls[2]*Math.pow(rv,n));    
         }
-        
-
     }
 
     return color;
@@ -159,7 +157,7 @@ function setupWebGL() {
     catch(e) {
       console.log(e);
     } // end catch
- 
+
 } // end setupWebGL
 
 // read triangles in, load them into webgl buffers
@@ -226,8 +224,8 @@ function loadTriangles() {
                 coordArray.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]);
 
                 var normal = inputTriangles[whichSet].normals[whichSetVert];
-                var color = lighting(normal,inputTriangles[whichSet].vertices[whichSetVert],ka,kd,ks,n);
-                colorArray.push(color[0],color[1],color[2]);
+                vtxColorToAdd = lighting(normal,inputTriangles[whichSet].vertices[whichSetVert],ka,kd,ks,n);
+                colorArray.push(vtxColorToAdd[0],vtxColorToAdd[1],vtxColorToAdd[2]);
                 vtxBufferSize +=1;
                 vtxColorBufferSize += 1;
 
@@ -245,11 +243,13 @@ function loadTriangles() {
     } // end if triangles found
 } // end load triangles
 
-function loadEllipes() {
+function loadEllipsoids() {
     var inputEcllipes = getJSONFile(INPUT_SPHERES_URL,"ellipsoids");
 
     if (inputEcllipes != String.null) { 
+        var whichSet;
         var vtxToAdd = []; // vtx coords to add to the coord array
+        var vtxColorToAdd = [];
         var indexOffset = vec3.create(); // the index offset for the current set
         var triToAdd = vec3.create(); // tri indices to add to the index array
 
@@ -258,7 +258,7 @@ function loadEllipes() {
 
         eliNum = inputEcllipes.length;
         
-        for (var whichSet=0; whichSet<inputEcllipes.length; whichSet++) {
+        for (whichSet=0; whichSet<inputEcllipes.length; whichSet++) {
             var ka = inputEcllipes[whichSet].ambient;
             var kd = inputEcllipes[whichSet].diffuse;
             var ks = inputEcllipes[whichSet].specular;
@@ -309,21 +309,21 @@ function loadEllipes() {
                 var normal = vec3.clone(getnormal([x,y,z],[centerX,centerY,centerZ],[radiusA,radiusB,radiusC]));
                 vec3.normalize(normal,normal);
 
-                var coord = transform([x,y,z]);
-                var color = lighting(normal,[x,y,z],ka,kd,ks,n);
+                vtxToAdd = transform([x,y,z]);
+                vtxColorToAdd = lighting(normal,[x,y,z],ka,kd,ks,n);
 
                 // select model
                 if(whichSet === selectEliID) {
-                    coord[0] += eliTranslation[0];
-                    coord[1] += eliTranslation[1];
-                    coord[2] += eliTranslation[2];
+                    vtxToAdd[0] += eliTranslation[0];
+                    vtxToAdd[1] += eliTranslation[1];
+                    vtxToAdd[2] += eliTranslation[2];
 
                     // coord[0] = coord[0] * 1.2;
                     // coord[1] = coord[1] * 1.2;
                     // coord[2] = coord[2] * 1.2;
-                    coord[0] = coord[0] * 1.2 >= 1? 0.999 : coord[0] * 1.2;
-                    coord[1] = coord[1] * 1.2 >= 1? 0.999 : coord[1] * 1.2;
-                    coord[2] = coord[2] * 1.2 >= 1? 0.999 : coord[2] * 1.2;
+                    vtxToAdd[0] = vtxToAdd[0] * 1.2 >= 1? 0.999 : vtxToAdd[0] * 1.2;
+                    vtxToAdd[1] = vtxToAdd[1] * 1.2 >= 1? 0.999 : vtxToAdd[1] * 1.2;
+                    vtxToAdd[2] = vtxToAdd[2] * 1.2 >= 1? 0.999 : vtxToAdd[2] * 1.2;
 
                     // var vtxVec = vec3.fromValues(coord[0],coord[1],coord[2]);
                     // vec3.normalize(vtxVec,vtxVec);
@@ -335,8 +335,8 @@ function loadEllipes() {
                 var first =  vtxBufferSize;
                 var second = first + lonInt + 1;
 
-                coordArray.push(coord[0],coord[1],coord[2]);
-                colorArray.push(color[0],color[1],color[2]);
+                coordArray.push(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]);
+                colorArray.push(vtxColorToAdd[0],vtxColorToAdd[1],vtxColorToAdd[2]);
                 indexArray.push(first,second,first + 1);
                 indexArray.push(second,second + 1,first + 1);
 
@@ -365,6 +365,7 @@ function loadEllipes() {
 
 } // end load triangles
 
+// get normal for a vertex on ellipsoids
 function getnormal(coord,center,radius){
     var x = (coord[0]*2-center[0]*2)/radius[0]/radius[0];
     var y = (coord[1]*2-center[1]*2)/radius[1]/radius[1];
@@ -454,7 +455,7 @@ function reset() {
     eye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
     lookat = new vec3.fromValues(0,0,1);
     lookup = new vec4.fromValues(0,1,0);
-    light = [{x: -1, y: 3, z: -0.5, ambient: [1,1,1], diffuse: [1,1,1], specular: [1,1,1]}];
+    light = getJSONFile(INPUT_LIGHTS_URL,"triangles");
     lightingMethod = 1;
     nAdd = 0;
     aAdd = 0;
@@ -473,7 +474,7 @@ function reset() {
 
 // add keyboard event
 document.addEventListener('keydown', function(event) {
-    console.log(event.key);
+    // console.log(event.key);
     switch(event.key) {
         case "q":
             vec3.add(eye,eye,[0,-0.1,0]);
@@ -585,9 +586,16 @@ function drawMain() {
     indexArray = []; // 1D array of vertex indices for WebGL
     colorArray = []; // 1D array of vertex indices for WebGL
 
+    var eyePos = document.getElementById("eyePos");
+    eyePos.innerHTML = "Eye position: [" + eye + "]";
+    var lookUp = document.getElementById("lookUp");
+    lookUp.innerHTML = "Look up: : [" + lookup + "]";
+    var lookAt = document.getElementById("lookAt");
+    lookAt.innerHTML = "Look at: [" + lookat + "]";
+
     setupWebGL(); // set up the webGL environment
     loadTriangles(); // load in the triangles from tri file
-    loadEllipes(); // load in the triangles from tri file
+    loadEllipsoids(); // load in the triangles from tri file
     setupShaders(); // setup the webGL shaders
     renderObjects(); // draw the triangles using webGL
 }
@@ -595,7 +603,7 @@ function drawMain() {
 function main() {
     lookat = new vec3.fromValues(0,0,1);
     lookup = new vec3.fromValues(0,1,0);
-    light = [{x: -1, y: 3, z: -0.5, ambient: [1,1,1], diffuse: [1,1,1], specular: [1,1,1]}];
+    light = getJSONFile(INPUT_LIGHTS_URL,"triangles");
     lightingMethod = 1;
     drawMain();
 } // end main
