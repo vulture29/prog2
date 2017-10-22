@@ -14,22 +14,25 @@ var trilNum = 0;
 var elilNum = 0;
 
 var eye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
-var lookat;
-var lookup;
-var light;
-var lightingMethod;
+var lookat = new vec3.fromValues(0,0,1);
+var lookup = new vec3.fromValues(0,1,0);
+
+var light = getJSONFile(INPUT_LIGHTS_URL,"triangles");;
+var lightingMethod = 1;
 var nAdd = 0;
 var aAdd = 0;
 var dAdd = 0;
 var sAdd = 0;
 var triTranslation = [0.0,0.0,0.0];
 var eliTranslation = [0.0,0.0,0.0];
-var xTheta = 0;
-var yTheta = 0;
-var zTheta = 0;
+var xThetaView = 0;
+var yThetaView = 0;
+
+var flag = 1;
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
+var shaderProgram = null;
 var vertexBuffer; // this contains vertex coordinates in triples
 var triangleColorBuffer; // this contains indices into vertexBuffer in triples
 var triangleBuffer; // this contains indices into vertexBuffer in triples
@@ -44,18 +47,22 @@ var coordArray = []; // 1D array of vertex coords for WebGL
 var indexArray = []; // 1D array of vertex indices for WebGL
 var colorArray = []; // 1D array of vertex colors for WebGL
 
-// ASSIGNMENT HELPER FUNCTIONS
-function transform(vtxs){
-    var vtx = new vec3.fromValues(vtxs[0], vtxs[1], vtxs[2]);
+var mvMatrix = mat4.create();
+var pMatrix = mat4.create();
 
-    var center = vec3.add(vec3.create(),eye,lookat);
-    var matview = mat4.lookAt(mat4.create(), eye, center, lookup);
-    var matPers = mat4.perspective(mat4.create(), Math.PI/2., 1, 0.1, 10);
+function getRotateMatrix(theta, x, y, z) {
+  var s = Math.sin(theta);
+  var c = Math.cos(theta);
+  var m = mat4.fromValues(x * x * (1 - c) + c, x * y * (1 - c) - z * s, x * z * (1 - c) + y * s,
+               0, y * x * (1 - c) + z * s, y * y * (1 - c) + c, y * z * (1 - c) - x * s,
+               0, x * z * (1 - c) - y * s, y * z * (1 - c) + x * s, z * z * (1 - c) + c,
+               0, 0, 0, 0, 1);
+  return m;
+};
 
-    vec3.transformMat4(vtx, vtx, matview);
-    vec3.transformMat4(vtx, vtx, matPers);
-
-    return vtx;
+function setMatrixUniforms() {
+    gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, pMatrix);
+    gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, mvMatrix);
 }
 
 function lighting(normal,vertex,ka,kd,ks,n){
@@ -198,8 +205,9 @@ function loadTriangles() {
 
             // set up the vertex coord array
             for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++) {
-                vtxToAdd = transform(inputTriangles[whichSet].vertices[whichSetVert]);
-                
+                // vtxToAdd = transform(inputTriangles[whichSet].vertices[whichSetVert]);
+                vtxToAdd = inputTriangles[whichSet].vertices[whichSetVert];
+
                 // select triangle
                 if(whichSet === selectTriID) {
                     vtxToAdd[0] += triTranslation[0];
@@ -209,18 +217,8 @@ function loadTriangles() {
                     vtxToAdd[0] = vtxToAdd[0] * 1.2;
                     vtxToAdd[1] = vtxToAdd[1] * 1.2;
                     vtxToAdd[2] = vtxToAdd[2] * 1.2;
-
-                    if(vtxToAdd[2] > 0){
-                        var vtxVec = vec3.fromValues(vtxToAdd[0],vtxToAdd[1],vtxToAdd[2]);
-                        vec3.normalize(vtxVec,vtxVec);
-                        vtxToAdd[0] = vtxVec[0];
-                        vtxToAdd[1] = vtxVec[1];
-                        vtxToAdd[2] = vtxVec[2];
-                    }
-                    else {
-                        vtxToAdd[2] = 1;   
-                    }
                 }
+
                 coordArray.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]);
 
                 var normal = inputTriangles[whichSet].normals[whichSetVert];
@@ -309,7 +307,7 @@ function loadEllipsoids() {
                 var normal = vec3.clone(getnormal([x,y,z],[centerX,centerY,centerZ],[radiusA,radiusB,radiusC]));
                 vec3.normalize(normal,normal);
 
-                vtxToAdd = transform([x,y,z]);
+                vtxToAdd = [x,y,z];
                 vtxColorToAdd = lighting(normal,[x,y,z],ka,kd,ks,n);
 
                 // select model
@@ -318,18 +316,10 @@ function loadEllipsoids() {
                     vtxToAdd[1] += eliTranslation[1];
                     vtxToAdd[2] += eliTranslation[2];
 
-                    // coord[0] = coord[0] * 1.2;
-                    // coord[1] = coord[1] * 1.2;
-                    // coord[2] = coord[2] * 1.2;
-                    vtxToAdd[0] = vtxToAdd[0] * 1.2 >= 1? 0.999 : vtxToAdd[0] * 1.2;
-                    vtxToAdd[1] = vtxToAdd[1] * 1.2 >= 1? 0.999 : vtxToAdd[1] * 1.2;
-                    vtxToAdd[2] = vtxToAdd[2] * 1.2 >= 1? 0.999 : vtxToAdd[2] * 1.2;
+                    vtxToAdd[0] = vtxToAdd[0] * 1.2;
+                    vtxToAdd[1] = vtxToAdd[1] * 1.2;
+                    vtxToAdd[2] = vtxToAdd[2] * 1.2;
 
-                    // var vtxVec = vec3.fromValues(coord[0],coord[1],coord[2]);
-                    // vec3.normalize(vtxVec,vtxVec);
-                    // coord[0] = vtxVec[0];
-                    // coord[1] = vtxVec[1];
-                    // coord[2] = vtxVec[2];
                 }
                 
                 var first =  vtxBufferSize;
@@ -389,10 +379,14 @@ function setupShaders() {
     var vShaderCode = `
         attribute vec3 vertexPosition;
         attribute vec3 vertexColor;
+
+        uniform mat4 uMVMatrix;
+        uniform mat4 uPMatrix;
+
         varying lowp vec4 vColor;
 
         void main(void) {
-            gl_Position = vec4(vertexPosition, 1.0); // use the untransformed position
+            gl_Position = uPMatrix * uMVMatrix * vec4(vertexPosition, 1.0); // use the untransformed position
             vColor = vec4(vertexColor,1.0);
         }
     `;
@@ -413,7 +407,7 @@ function setupShaders() {
             throw "error during vertex shader compile: " + gl.getShaderInfoLog(vShader);  
             gl.deleteShader(vShader);
         } else { // no compile errors
-            var shaderProgram = gl.createProgram(); // create the single shader program
+            shaderProgram = gl.createProgram(); // create the single shader program
             gl.attachShader(shaderProgram, fShader); // put frag shader in program
             gl.attachShader(shaderProgram, vShader); // put vertex shader in program
             gl.linkProgram(shaderProgram); // link program into gl context
@@ -429,6 +423,9 @@ function setupShaders() {
                 vertexColorAttrib = // get pointer to vertex shader input
                     gl.getAttribLocation(shaderProgram, "vertexColor"); 
                 gl.enableVertexAttribArray(vertexColorAttrib); // input to shader from array
+
+                shaderProgram.pMatrixUniform = gl.getUniformLocation(shaderProgram, "uPMatrix");
+                shaderProgram.mvMatrixUniform = gl.getUniformLocation(shaderProgram, "uMVMatrix");
             } // end if no shader program link errors
         } // end if no compile errors
     } // end try 
@@ -439,14 +436,22 @@ function setupShaders() {
 } // end setup shaders
 
 function renderObjects() {
+    // gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+    // Enable the depth buffer
+    // gl.enable(gl.DEPTH_TEST);
+
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // clear frame/depth buffers
+
+    var center = vec3.add(vec3.create(),eye,lookat);   
+    mvMatrix = mat4.lookAt(mat4.create(), eye, center, lookup);
+    pMatrix = mat4.perspective(mat4.create(), Math.PI/2, 1, 0.1, 100);
     
     gl.bindBuffer(gl.ARRAY_BUFFER,vertexBuffer); // activate
     gl.vertexAttribPointer(vertexPositionAttrib,3,gl.FLOAT,false,0,0); // feed
-
+    
     gl.bindBuffer(gl.ARRAY_BUFFER,triangleColorBuffer);
     gl.vertexAttribPointer(vertexColorAttrib,3,gl.FLOAT,false,0,0); // feed
-
+    setMatrixUniforms();
     gl.drawElements(gl.TRIANGLES,triBufferSize,gl.UNSIGNED_SHORT,0); // render
 
 } // end render triangles
@@ -454,20 +459,34 @@ function renderObjects() {
 function reset() {
     eye = new vec3.fromValues(0.5,0.5,-0.5); // default eye position in world space
     lookat = new vec3.fromValues(0,0,1);
-    lookup = new vec4.fromValues(0,1,0);
-    light = getJSONFile(INPUT_LIGHTS_URL,"triangles");
+    lookup = new vec3.fromValues(0,1,0);
+
+    light = getJSONFile(INPUT_LIGHTS_URL,"triangles");;
     lightingMethod = 1;
     nAdd = 0;
     aAdd = 0;
     dAdd = 0;
     sAdd = 0;
-    selectTriID = -1;
-    selectEliID = -1;
     triTranslation = [0.0,0.0,0.0];
     eliTranslation = [0.0,0.0,0.0];
-    xTheta = 0;
-    yTheta = 0;
-    zTheta = 0;
+    xThetaView = 0;
+    yThetaView = 0;
+
+    flag = 1;
+
+    /* webgl globals */
+    gl = null; // the all powerful gl object. It's all here folks!
+    shaderProgram = null;
+    triBufferSize = 0; // the number of indices in the triangle buffer
+    vtxBufferSize = 0; // the number of vertices in the vertex buffer
+    vtxColorBufferSize = 0; // the number of vertices in the vertex buffer
+
+    coordArray = []; // 1D array of vertex coords for WebGL
+    indexArray = []; // 1D array of vertex indices for WebGL
+    colorArray = []; // 1D array of vertex colors for WebGL
+
+    mvMatrix = mat4.create();
+    pMatrix = mat4.create();
 
     drawMain();
 }
@@ -495,16 +514,28 @@ document.addEventListener('keydown', function(event) {
             vec3.add(eye,eye,[0,0,-0.1]);
             break;
         case "A":
-            vec3.add(lookat,lookat,[-0.1,0,0]);
+            yThetaView -= 0.1;
+            lookat[0] = Math.sin(yThetaView);
+            lookat[2] = Math.cos(yThetaView);
             break;
         case "D":
-            vec3.add(lookat,lookat,[0.1,0,0]);
+            yThetaView += 0.1;
+            lookat[0] = Math.sin(yThetaView);  
+            lookat[2] = Math.cos(yThetaView);
             break;
         case "W":
-            vec3.add(lookat,lookat,[0,-0.1,0]);
+            xThetaView += 0.1;
+            lookat[1] = Math.sin(xThetaView);
+            lookat[2] = Math.cos(xThetaView);
+            lookup[1] = Math.cos(xThetaView);
+            lookup[2] = -Math.sin(xThetaView);
             break;
         case "S":
-            vec3.add(lookat,lookat,[0,0.1,0]);
+            xThetaView -= 0.1;
+            lookat[1] = Math.sin(xThetaView);
+            lookat[2] = Math.cos(xThetaView);
+            lookup[1] = Math.cos(xThetaView);
+            lookup[2] = -Math.sin(xThetaView);
             break;
         case "ArrowLeft": 
             triTranslation = [0.0,0.0,0.0];
@@ -565,10 +596,39 @@ document.addEventListener('keydown', function(event) {
             vec3.add(triTranslation,triTranslation,[0,-0.1,0]);
             vec3.add(eliTranslation,eliTranslation,[0,-0.1,0]);
             break;
+        case "K": 
+            var rMatrix = getRotateMatrix(0.1, 0, 1, 0);
+            vec3.transformMat4(triTranslation, triTranslation, rMatrix);
+            vec3.transformMat4(eliTranslation, eliTranslation, rMatrix);
+            break;
+        case ":": 
+            var rMatrix = getRotateMatrix(0.1, 0, -1, 0);
+            vec3.transformMat4(triTranslation, triTranslation, rMatrix);
+            vec3.transformMat4(eliTranslation, eliTranslation, rMatrix);
+            break;
+        case "O": 
+            var rMatrix = getRotateMatrix(0.1, 1, 0, 0);
+            vec3.transformMat4(triTranslation, triTranslation, rMatrix);
+            vec3.transformMat4(eliTranslation, eliTranslation, rMatrix);
+            break;
+        case "L": 
+            var rMatrix = getRotateMatrix(0.1, -1, 0, 0);
+            vec3.transformMat4(triTranslation, triTranslation, rMatrix);
+            vec3.transformMat4(eliTranslation, eliTranslation, rMatrix);
+            break;
+        case "I": 
+            var rMatrix = getRotateMatrix(0.1, 0, 0, -1);
+            vec3.transformMat4(triTranslation, triTranslation, rMatrix);
+            vec3.transformMat4(eliTranslation, eliTranslation, rMatrix);
+            break;
+        case "P": 
+            var rMatrix = getRotateMatrix(0.1, 0, 0, 1);
+            vec3.transformMat4(triTranslation, triTranslation, rMatrix);
+            vec3.transformMat4(eliTranslation, eliTranslation, rMatrix);
+            break;
         default:
             break;
     }
-
     drawMain(); 
 });
 
@@ -576,7 +636,7 @@ function drawMain() {
     // console.log(eye);
     // console.log(lookat);
     // console.log(lookup);
-
+    flag = 1;
     // reinit gl and buffer size
     gl = null; // the all powerful gl object. It's all here folks!
     triBufferSize = 0; // the number of indices in the triangle buffer
@@ -589,7 +649,7 @@ function drawMain() {
     var eyePos = document.getElementById("eyePos");
     eyePos.innerHTML = "Eye position: [" + eye + "]";
     var lookUp = document.getElementById("lookUp");
-    lookUp.innerHTML = "Look up: : [" + lookup + "]";
+    lookUp.innerHTML = "Look up: [" + lookup + "]";
     var lookAt = document.getElementById("lookAt");
     lookAt.innerHTML = "Look at: [" + lookat + "]";
 
@@ -601,9 +661,5 @@ function drawMain() {
 }
 
 function main() {
-    lookat = new vec3.fromValues(0,0,1);
-    lookup = new vec3.fromValues(0,1,0);
-    light = getJSONFile(INPUT_LIGHTS_URL,"triangles");
-    lightingMethod = 1;
     drawMain();
 } // end main
