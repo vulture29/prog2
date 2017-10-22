@@ -50,6 +50,13 @@ var colorArray = []; // 1D array of vertex colors for WebGL
 var mvMatrix = mat4.create();
 var pMatrix = mat4.create();
 
+function scale(vtxs, center, factor){
+    var vtx = new vec3.fromValues(vtxs[0], vtxs[1], vtxs[2]);
+    vec3.subtract(vtx,vtx,center);
+    vec3.scaleAndAdd(vtx,center,vtx,factor);
+    return vtx;
+}
+
 function getRotateMatrix(theta, x, y, z) {
   var s = Math.sin(theta);
   var c = Math.cos(theta);
@@ -178,8 +185,10 @@ function loadTriangles() {
         var vtxColorToAdd = [];
         var indexOffset = vec3.create(); // the index offset for the current set
         var triToAdd = vec3.create(); // tri indices to add to the index array
+        var center = [0, 0, 0];
 
         trilNum = inputTriangles.length;
+
         
         for (var whichSet=0; whichSet<inputTriangles.length; whichSet++) {
 
@@ -203,8 +212,17 @@ function loadTriangles() {
             n[1] = (n[1] + nAdd) % 20;
             n[2] = (n[2] + nAdd) % 20;
 
+            var verLength = inputTriangles[whichSet].vertices.length;
+
+            for (whichSetVert=0; whichSetVert<verLength; whichSetVert++) {
+                var coord = inputTriangles[whichSet].vertices[whichSetVert];
+                center[0] += coord[0]/verLength;
+                center[1] += coord[1]/verLength;
+                center[2] += coord[2]/verLength;
+            }
+
             // set up the vertex coord array
-            for (whichSetVert=0; whichSetVert<inputTriangles[whichSet].vertices.length; whichSetVert++) {
+            for (whichSetVert=0; whichSetVert<verLength; whichSetVert++) {
                 // vtxToAdd = transform(inputTriangles[whichSet].vertices[whichSetVert]);
                 vtxToAdd = inputTriangles[whichSet].vertices[whichSetVert];
 
@@ -214,10 +232,10 @@ function loadTriangles() {
                     vtxToAdd[1] += triTranslation[1];
                     vtxToAdd[2] += triTranslation[2];
 
-                    vtxToAdd[0] = vtxToAdd[0] * 1.2;
-                    vtxToAdd[1] = vtxToAdd[1] * 1.2;
-                    vtxToAdd[2] = vtxToAdd[2] * 1.2;
+                    vtxToAdd = scale(vtxToAdd,center,1.2);
                 }
+                if(whichSet == 1)
+                    console.log(vtxToAdd);
 
                 coordArray.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]);
 
@@ -282,6 +300,12 @@ function loadEllipsoids() {
             var radiusB = inputEcllipes[whichSet].b;
             var radiusC = inputEcllipes[whichSet].c;
 
+            if(whichSet == selectEliID) {
+                radiusA *= 1.2;
+                radiusB *= 1.2;
+                radiusC *= 1.2;
+            }
+
             var centerX = inputEcllipes[whichSet].x;
             var centerY = inputEcllipes[whichSet].y;
             var centerZ = inputEcllipes[whichSet].z;
@@ -311,14 +335,14 @@ function loadEllipsoids() {
                 vtxColorToAdd = lighting(normal,[x,y,z],ka,kd,ks,n);
 
                 // select model
-                if(whichSet === selectEliID) {
+                if(whichSet == selectEliID) {
                     vtxToAdd[0] += eliTranslation[0];
                     vtxToAdd[1] += eliTranslation[1];
                     vtxToAdd[2] += eliTranslation[2];
 
-                    vtxToAdd[0] = vtxToAdd[0] * 1.2;
-                    vtxToAdd[1] = vtxToAdd[1] * 1.2;
-                    vtxToAdd[2] = vtxToAdd[2] * 1.2;
+                    // vtxToAdd[0] = vtxToAdd[0] * 1.2;
+                    // vtxToAdd[1] = vtxToAdd[1] * 1.2;
+                    // vtxToAdd[2] = vtxToAdd[2] * 1.2;
 
                 }
                 
