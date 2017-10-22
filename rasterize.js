@@ -32,6 +32,7 @@ var flag = 1;
 
 /* webgl globals */
 var gl = null; // the all powerful gl object. It's all here folks!
+var canvas = null;
 var shaderProgram = null;
 var vertexBuffer; // this contains vertex coordinates in triples
 var triangleColorBuffer; // this contains indices into vertexBuffer in triples
@@ -155,8 +156,12 @@ function setupWebGL() {
     vtxBufferSize = 0; // the number of vertices in the vertex buffer
 
     // Get the canvas and context
-    var canvas = document.getElementById("myWebGLCanvas"); // create a js canvas
+    canvas = document.getElementById("myWebGLCanvas"); // create a js canvas
     gl = canvas.getContext("webgl"); // get a webgl object from it
+
+    canvas.onmousedown = handleMouseDown;
+    document.onmouseup = handleMouseUp;
+    document.onmousemove = handleMouseMove;
     
     try {
       if (gl == null) {
@@ -654,6 +659,62 @@ document.addEventListener('keydown', function(event) {
     }
     drawMain(); 
 });
+
+function degToRad(degrees) {
+    return degrees * Math.PI / 180;
+}
+
+var mouseDown = false;
+var lastMouseX = null;
+var lastMouseY = null;
+
+var newX = null;
+var newY = null;
+
+var moonRotationMatrix = mat4.create();
+mat4.identity(moonRotationMatrix);
+
+function handleMouseDown(event) {
+    lastMouseX = event.clientX;
+    lastMouseY = event.clientY;
+    if(mouseDown == false) {
+        console.log("Down: "+lastMouseX+", "+lastMouseY);
+    }
+    mouseDown = true;
+}
+
+
+function handleMouseUp(event) {
+    if(mouseDown) {
+        console.log("Up: "+lastMouseX+", "+lastMouseY);
+    }
+    mouseDown = false;
+}
+
+function handleMouseMove(event) {
+    if (!mouseDown) {
+        return;
+    }
+
+    newX = event.clientX;
+    newY = event.clientY;
+
+    yThetaView += (newX-lastMouseX)/512;
+    lookat[0] = Math.sin(yThetaView);
+    lookat[2] = Math.cos(yThetaView);
+    xThetaView += (newY-lastMouseY)/512;
+    lookat[1] = Math.sin(xThetaView);
+    lookat[2] = Math.cos(xThetaView);
+    lookup[1] = Math.cos(xThetaView);
+    lookup[2] = -Math.sin(xThetaView);
+
+    drawMain(); 
+
+    lastMouseX = newX;
+    lastMouseY = newY;
+    
+    // console.log(lastMouseY);
+}
 
 function drawMain() {
     // console.log(eye);
