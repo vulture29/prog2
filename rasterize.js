@@ -185,7 +185,6 @@ function loadTriangles() {
         var vtxColorToAdd = [];
         var indexOffset = vec3.create(); // the index offset for the current set
         var triToAdd = vec3.create(); // tri indices to add to the index array
-        var center = [0, 0, 0];
 
         trilNum = inputTriangles.length;
 
@@ -213,6 +212,7 @@ function loadTriangles() {
             n[2] = (n[2] + nAdd) % 20;
 
             var verLength = inputTriangles[whichSet].vertices.length;
+            var center = [0, 0, 0];
 
             for (whichSetVert=0; whichSetVert<verLength; whichSetVert++) {
                 var coord = inputTriangles[whichSet].vertices[whichSetVert];
@@ -226,6 +226,7 @@ function loadTriangles() {
                 // vtxToAdd = transform(inputTriangles[whichSet].vertices[whichSetVert]);
                 vtxToAdd = inputTriangles[whichSet].vertices[whichSetVert];
 
+
                 // select triangle
                 if(whichSet === selectTriID) {
                     vtxToAdd[0] += triTranslation[0];
@@ -234,8 +235,6 @@ function loadTriangles() {
 
                     vtxToAdd = scale(vtxToAdd,center,1.2);
                 }
-                if(whichSet == 1)
-                    console.log(vtxToAdd);
 
                 coordArray.push(vtxToAdd[0], vtxToAdd[1], vtxToAdd[2]);
 
