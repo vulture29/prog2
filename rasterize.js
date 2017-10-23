@@ -28,6 +28,16 @@ var eliTranslation = [0.0,0.0,0.0];
 var xThetaView = 0;
 var yThetaView = 0;
 
+var mouseDown = false;
+var lastMouseX = null;
+var lastMouseY = null;
+
+var newX = null;
+var newY = null;
+
+var moonRotationMatrix = mat4.create();
+mat4.identity(moonRotationMatrix);
+
 var flag = 1;
 
 /* webgl globals */
@@ -519,6 +529,12 @@ function reset() {
     drawMain();
 }
 
+document.addEventListener('mousewheel', function(event) {
+
+    vec3.add(eye,eye,[0,0,-event.deltaY/canvas.width]);
+    drawMain();
+});
+
 // add keyboard event
 document.addEventListener('keydown', function(event) {
     // console.log(event.key);
@@ -664,30 +680,14 @@ function degToRad(degrees) {
     return degrees * Math.PI / 180;
 }
 
-var mouseDown = false;
-var lastMouseX = null;
-var lastMouseY = null;
-
-var newX = null;
-var newY = null;
-
-var moonRotationMatrix = mat4.create();
-mat4.identity(moonRotationMatrix);
-
 function handleMouseDown(event) {
     lastMouseX = event.clientX;
     lastMouseY = event.clientY;
-    if(mouseDown == false) {
-        console.log("Down: "+lastMouseX+", "+lastMouseY);
-    }
     mouseDown = true;
 }
 
 
 function handleMouseUp(event) {
-    if(mouseDown) {
-        console.log("Up: "+lastMouseX+", "+lastMouseY);
-    }
     mouseDown = false;
 }
 
@@ -699,10 +699,10 @@ function handleMouseMove(event) {
     newX = event.clientX;
     newY = event.clientY;
 
-    yThetaView += (newX-lastMouseX)/512;
+    yThetaView += (newX-lastMouseX)/canvas.width;
     lookat[0] = Math.sin(yThetaView);
     lookat[2] = Math.cos(yThetaView);
-    xThetaView += (newY-lastMouseY)/512;
+    xThetaView += (newY-lastMouseY)/canvas.width;
     lookat[1] = Math.sin(xThetaView);
     lookat[2] = Math.cos(xThetaView);
     lookup[1] = Math.cos(xThetaView);
